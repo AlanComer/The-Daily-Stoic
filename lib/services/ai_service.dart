@@ -6,9 +6,9 @@ import 'package:http/http.dart' as http;
 
 class AiService {
   static const _prompt =
-      'In one sentence, summarize the following Stoic passage for a personal diary entry:\n\n';
+      'In one short sentence, summarize the key insight of the following Stoic passage:\n\n';
 
-  /// Generates a one-line diary summary for [body] using the given [provider].
+  /// Generates a one-line summary for [body] using the given [provider].
   ///
   /// [provider] must be 'openai', 'anthropic', or 'ollama'.
   /// [apiKey] is ignored for Ollama — pass an empty string.

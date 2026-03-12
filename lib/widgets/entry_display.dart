@@ -29,14 +29,19 @@ class EntryDisplay extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Title — small-caps style
-          Text(
-            entry.title,
-            style: TextStyle(
-              fontSize: 11,
-              letterSpacing: 2.0,
-              color: const Color(0xFFF0EDE8).withOpacity(0.45),
-              fontWeight: FontWeight.w600,
+          // Title
+          Center(
+            child: Text(
+              entry.title,
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
+              style: TextStyle(
+                fontSize: 20,
+                letterSpacing: 2.0,
+                color: const Color(0xFFF0EDE8).withOpacity(0.75),
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
 
@@ -51,25 +56,31 @@ class EntryDisplay extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Body text
-          Text(
-            entry.body,
-            style: GoogleFonts.lora(
-              fontSize: 15,
-              color: const Color(0xFFF0EDE8).withOpacity(0.85),
-              height: 1.8,
-            ),
-          ),
+          // Body text — split on paragraph breaks, reflow within each paragraph
+          ...entry.body.split('\n\n').where((p) => p.trim().isNotEmpty).map((paragraph) {
+            final text = paragraph.replaceAll('\n', ' ').trim();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Text(
+                text,
+                style: GoogleFonts.lora(
+                  fontSize: 15,
+                  color: const Color(0xFFF0EDE8).withOpacity(0.85),
+                  height: 1.8,
+                ),
+              ),
+            );
+          }),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
 
           const _Divider(),
 
           const SizedBox(height: 20),
 
-          // Diary summary section
+          // Summary section
           Text(
-            'DIARY SUMMARY',
+            'SUMMARY',
             style: TextStyle(
               fontSize: 10,
               letterSpacing: 1.8,
