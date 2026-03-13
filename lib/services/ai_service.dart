@@ -6,7 +6,7 @@ import 'package:http/http.dart' as http;
 
 class AiService {
   static const _prompt =
-      'In one short sentence, summarize the key insight of the following Stoic passage:\n\n';
+      'Summarize the key insight of the following Stoic passage in one concise sentence of 15 words or fewer. Reply with only the sentence, no preamble:\n\n';
 
   /// Generates a one-line summary for [body] using the given [provider].
   ///

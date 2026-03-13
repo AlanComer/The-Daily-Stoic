@@ -56,13 +56,13 @@ class EntryDisplay extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Body text — split on paragraph breaks, reflow within each paragraph
-          ...entry.body.split('\n\n').where((p) => p.trim().isNotEmpty).map((paragraph) {
-            final text = paragraph.replaceAll('\n', ' ').trim();
+          // Body text — detect paragraph boundaries by sentence-ending lines,
+          // then reflow each paragraph to fill available width.
+          ..._splitParagraphs(entry.body).map((paragraph) {
             return Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Text(
-                text,
+                paragraph,
                 style: GoogleFonts.lora(
                   fontSize: 15,
                   color: const Color(0xFFF0EDE8).withOpacity(0.85),
@@ -97,6 +97,29 @@ class EntryDisplay extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Splits [body] into reflowed paragraphs.
+  ///
+  /// Lines are wrapped at ~90 chars in the source data with no double newlines.
+  /// A paragraph ends when a line closes with sentence-ending punctuation
+  /// (`.`, `!`, `?`, `…`, or their quoted variants like `."` `!'`).
+  static List<String> _splitParagraphs(String body) {
+    final lines = body.split('\n');
+    final paragraphs = <String>[];
+    final current = <String>[];
+    final sentenceEnd = RegExp("[.!?…]['\"\u201d\u2019]?\\s*\$");
+
+    for (final line in lines) {
+      if (line.trim().isEmpty) continue;
+      current.add(line.trim());
+      if (sentenceEnd.hasMatch(line)) {
+        paragraphs.add(current.join(' '));
+        current.clear();
+      }
+    }
+    if (current.isNotEmpty) paragraphs.add(current.join(' '));
+    return paragraphs;
   }
 
   Widget _buildSummaryContent() {
