@@ -114,32 +114,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _pickDate() async {
-    // Year is irrelevant — only month+day are used for lookup.
-    // We anchor the picker in year 2000 so Feb 29 is always available.
-    final picked = await showDatePicker(
+    await showModalBottomSheet<void>(
       context: context,
-      initialDate: DateTime(2000, _selectedDate.month, _selectedDate.day),
-      firstDate: DateTime(2000, 1, 1),
-      lastDate: DateTime(2000, 12, 31),
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.dark(
-            primary: Color(0xFF8A7F70),
-            onPrimary: Color(0xFFF0EDE8),
-            surface: Color(0xFF242424),
-            onSurface: Color(0xFFF0EDE8),
-          ),
-        ),
-        child: child!,
+      backgroundColor: const Color(0xFF242424),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _MonthDayPicker(
+        month: _selectedDate.month,
+        day: _selectedDate.day,
+        onConfirm: (month, day) {
+          final newDate = DateTime(_selectedDate.year, month, day);
+          setState(() => _selectedDate = newDate);
+          _loadEntry(newDate);
+        },
       ),
     );
-
-    if (picked == null || !mounted) return;
-
-    // Map picker result back to current-timezone date, keeping month+day only.
-    final newDate = DateTime(_selectedDate.year, picked.month, picked.day);
-    setState(() => _selectedDate = newDate);
-    _loadEntry(newDate);
   }
 
   Future<void> _openSettings() async {
@@ -189,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildDateSelector() {
-    final label = DateFormat('MMMM d').format(_selectedDate);
+    final label = DateFormat('d MMMM').format(_selectedDate);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -249,6 +239,147 @@ class _HomeScreenState extends State<HomeScreen> {
       summary: _summary,
       errorMessage: _summaryError,
       onConfigureTapped: _openSettings,
+    );
+  }
+}
+
+// ── Month/Day picker ──────────────────────────────────────────────────────────
+
+class _MonthDayPicker extends StatefulWidget {
+  final int month;
+  final int day;
+  final void Function(int month, int day) onConfirm;
+
+  const _MonthDayPicker({
+    required this.month,
+    required this.day,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_MonthDayPicker> createState() => _MonthDayPickerState();
+}
+
+class _MonthDayPickerState extends State<_MonthDayPicker> {
+  late int _month;
+  late int _day;
+  late final FixedExtentScrollController _monthController;
+  late final FixedExtentScrollController _dayController;
+
+  static const _months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+
+  int _daysInMonth(int month) => DateTime(2000, month + 1, 0).day;
+
+  @override
+  void initState() {
+    super.initState();
+    _month = widget.month;
+    _day = widget.day;
+    _monthController = FixedExtentScrollController(initialItem: _month - 1);
+    _dayController = FixedExtentScrollController(initialItem: _day - 1);
+  }
+
+  @override
+  void dispose() {
+    _monthController.dispose();
+    _dayController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 300,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 4),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFF8A7F70).withOpacity(0.5),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  child: ListWheelScrollView(
+                    controller: _dayController,
+                    itemExtent: 44,
+                    perspective: 0.003,
+                    diameterRatio: 1.6,
+                    physics: const FixedExtentScrollPhysics(),
+                    onSelectedItemChanged: (i) => setState(() => _day = i + 1),
+                    children: List.generate(
+                      31,
+                      (i) => Center(
+                        child: Text(
+                          '${i + 1}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Color(0xFFF0EDE8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  flex: 2,
+                  child: ListWheelScrollView(
+                    controller: _monthController,
+                    itemExtent: 44,
+                    perspective: 0.003,
+                    diameterRatio: 1.6,
+                    physics: const FixedExtentScrollPhysics(),
+                    onSelectedItemChanged: (i) => setState(() => _month = i + 1),
+                    children: List.generate(
+                      12,
+                      (i) => Center(
+                        child: Text(
+                          _months[i],
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Color(0xFFF0EDE8),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+            child: SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  backgroundColor: const Color(0xFF8A7F70),
+                  foregroundColor: const Color(0xFFF0EDE8),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  widget.onConfirm(_month, _day.clamp(1, _daysInMonth(_month)));
+                },
+                child: const Text('Select', style: TextStyle(fontSize: 15)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
