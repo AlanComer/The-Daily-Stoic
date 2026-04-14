@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:intl/intl.dart';
@@ -266,12 +267,26 @@ class _MonthDayPickerState extends State<_MonthDayPicker> {
   late final FixedExtentScrollController _monthController;
   late final FixedExtentScrollController _dayController;
 
+  // Drag tracking for manual scroll handling
+  double _dayDragStart = 0;
+  int _dayStartItem = 0;
+  double _monthDragStart = 0;
+  int _monthStartItem = 0;
+
   static const _months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
   ];
 
+  static const _itemExtent = 44.0;
+
   int _daysInMonth(int month) => DateTime(2000, month + 1, 0).day;
+
+  void _scrollByDelta(FixedExtentScrollController controller, double dy, int maxIndex) {
+    if (dy == 0) return;
+    final next = (controller.selectedItem + (dy > 0 ? 1 : -1)).clamp(0, maxIndex);
+    controller.animateToItem(next, duration: const Duration(milliseconds: 150), curve: Curves.easeOut);
+  }
 
   @override
   void initState() {
@@ -287,6 +302,45 @@ class _MonthDayPickerState extends State<_MonthDayPicker> {
     _monthController.dispose();
     _dayController.dispose();
     super.dispose();
+  }
+
+  Widget _buildWheel({
+    required FixedExtentScrollController controller,
+    required int itemCount,
+    required int maxIndex,
+    required double dragStartRef,
+    required int startItemRef,
+    required void Function(double) onDragStart,
+    required void Function(double) onDragUpdate,
+    required void Function(int) onChanged,
+    required Widget Function(int) itemBuilder,
+  }) {
+    return Listener(
+      onPointerSignal: (event) {
+        if (event is PointerScrollEvent) {
+          _scrollByDelta(controller, event.scrollDelta.dy, maxIndex);
+        }
+      },
+      child: GestureDetector(
+        onVerticalDragStart: (d) => onDragStart(d.globalPosition.dy),
+        onVerticalDragUpdate: (d) => onDragUpdate(d.globalPosition.dy),
+        child: ListWheelScrollView(
+          controller: controller,
+          itemExtent: _itemExtent,
+          perspective: 0.003,
+          diameterRatio: 1.6,
+          physics: const NeverScrollableScrollPhysics(),
+          onSelectedItemChanged: (i) => setState(() => onChanged(i)),
+          children: List.generate(
+            itemCount,
+            (i) => GestureDetector(
+              onTap: () => controller.animateToItem(i, duration: const Duration(milliseconds: 200), curve: Curves.easeOut),
+              child: itemBuilder(i),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -307,48 +361,87 @@ class _MonthDayPickerState extends State<_MonthDayPicker> {
             ),
           ),
           Expanded(
-            child: Row(
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Expanded(
-                  child: ListWheelScrollView(
-                    controller: _dayController,
-                    itemExtent: 44,
-                    perspective: 0.003,
-                    diameterRatio: 1.6,
-                    physics: const FixedExtentScrollPhysics(),
-                    onSelectedItemChanged: (i) => setState(() => _day = i + 1),
-                    children: List.generate(
-                      31,
-                      (i) => Center(
-                        child: Text(
-                          '${i + 1}',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            color: Color(0xFFF0EDE8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildWheel(
+                        controller: _dayController,
+                        itemCount: 31,
+                        maxIndex: 30,
+                        dragStartRef: _dayDragStart,
+                        startItemRef: _dayStartItem,
+                        onDragStart: (y) {
+                          _dayDragStart = y;
+                          _dayStartItem = _dayController.selectedItem;
+                        },
+                        onDragUpdate: (y) {
+                          final delta = y - _dayDragStart;
+                          final next = (_dayStartItem + (-delta / _itemExtent).round()).clamp(0, 30);
+                          _dayController.jumpToItem(next);
+                        },
+                        onChanged: (i) => _day = i + 1,
+                        itemBuilder: (i) => Center(
+                          child: Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              fontSize: _day == i + 1 ? 20 : 16,
+                              fontWeight: _day == i + 1 ? FontWeight.w600 : FontWeight.w400,
+                              color: _day == i + 1
+                                  ? const Color(0xFFF0EDE8)
+                                  : const Color(0xFFF0EDE8).withOpacity(0.4),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ),
-                Expanded(
-                  flex: 2,
-                  child: ListWheelScrollView(
-                    controller: _monthController,
-                    itemExtent: 44,
-                    perspective: 0.003,
-                    diameterRatio: 1.6,
-                    physics: const FixedExtentScrollPhysics(),
-                    onSelectedItemChanged: (i) => setState(() => _month = i + 1),
-                    children: List.generate(
-                      12,
-                      (i) => Center(
-                        child: Text(
-                          _months[i],
-                          style: const TextStyle(
-                            fontSize: 18,
-                            color: Color(0xFFF0EDE8),
+                    Expanded(
+                      flex: 2,
+                      child: _buildWheel(
+                        controller: _monthController,
+                        itemCount: 12,
+                        maxIndex: 11,
+                        dragStartRef: _monthDragStart,
+                        startItemRef: _monthStartItem,
+                        onDragStart: (y) {
+                          _monthDragStart = y;
+                          _monthStartItem = _monthController.selectedItem;
+                        },
+                        onDragUpdate: (y) {
+                          final delta = y - _monthDragStart;
+                          final next = (_monthStartItem + (-delta / _itemExtent).round()).clamp(0, 11);
+                          _monthController.jumpToItem(next);
+                        },
+                        onChanged: (i) => _month = i + 1,
+                        itemBuilder: (i) => Center(
+                          child: Text(
+                            _months[i],
+                            style: TextStyle(
+                              fontSize: _month == i + 1 ? 20 : 16,
+                              fontWeight: _month == i + 1 ? FontWeight.w600 : FontWeight.w400,
+                              color: _month == i + 1
+                                  ? const Color(0xFFF0EDE8)
+                                  : const Color(0xFFF0EDE8).withOpacity(0.4),
+                            ),
                           ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                // Selection highlight band — sits over wheels, ignores all input
+                IgnorePointer(
+                  child: Container(
+                    height: _itemExtent,
+                    margin: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0EDE8).withOpacity(0.07),
+                      border: Border.symmetric(
+                        horizontal: BorderSide(
+                          color: const Color(0xFF8A7F70).withOpacity(0.5),
+                          width: 1,
                         ),
                       ),
                     ),
